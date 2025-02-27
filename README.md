@@ -3,11 +3,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
-A vector database implementation inspired by the "Titans: Learning to Memorize at Test Time" paper that manages hierarchical memory systems for handling extremely long contexts.
+A vector database implementation inspired by the "Titans: Learning to Memorize at Test Time" paper that manages hierarchical memory systems for handling extremely long contexts, integrated with the deepseek-r1-671b model via Venice.ai.
 
 ## Overview
 
-MemoryTitan implements the core concepts from the "Titans: Learning to Memorize at Test Time" paper, focusing on its memory architecture rather than the model training aspects. It provides a practical way to manage large context windows through three types of memory:
+MemoryTitan implements the core concepts from the "Titans: Learning to Memorize at Test Time" paper, focusing on its memory architecture for practical applications. It provides a way to manage large context windows through three types of memory:
 
 1. **Short-term Memory**: For immediate context (attention-based)
 2. **Long-term Memory**: A neural memory module that learns to memorize important information at runtime
@@ -18,33 +18,72 @@ MemoryTitan provides these memory systems in three architectural variants:
 - Memory as Gate (MAG)
 - Memory as Layer (MAL)
 
-## Installation
+## Installation on macOS with uv
+
+The fastest way to get started with MemoryTitan on macOS is to use [uv](https://github.com/astral-sh/uv), a fast Python package installer and resolver.
+
+### 1. Install uv
+
+If you don't have uv installed already, you can install it using:
 
 ```bash
-pip install memory-titan
+curl -sSf https://astral.sh/uv/install.sh | bash
 ```
 
-Or install from source:
+Or using Homebrew:
+
+```bash
+brew install uv
+```
+
+### 2. Clone the repository
 
 ```bash
 git clone https://github.com/yourusername/memory-titan.git
 cd memory-titan
-pip install -e .
 ```
 
-## Requirements
+### 3. Create and activate a virtual environment with uv
 
-- Python 3.9+
-- PyTorch 2.0+
-- NumPy
-- sentence-transformers
-- FAISS or Hnswlib (for vector similarity search)
+```bash
+uv venv
+source .venv/bin/activate
+```
+
+### 4. Install MemoryTitan with dependencies
+
+For a basic installation:
+
+```bash
+uv pip install -e .
+```
+
+For a full installation with all optional dependencies:
+
+```bash
+uv pip install -e ".[full]"
+```
+
+### 5. Set up your Venice.ai API credentials
+
+Copy the example environment file and add your API key:
+
+```bash
+cp .env_example .env
+```
+
+Then edit the `.env` file to add your Venice.ai API key:
+
+```
+VENICE_API_KEY=your_api_key_here
+```
 
 ## Quick Start
 
 ```python
 from memory_titan import TitansManager
-from memory_titan.embedders import SentenceTransformerEmbedder
+from memory_titan.embedding.embedders import SentenceTransformerEmbedder
+from llm_integration import venice_api
 
 # Initialize the embedder
 embedder = SentenceTransformerEmbedder("all-MiniLM-L6-v2")
@@ -67,13 +106,31 @@ titans.add_documents([
 ])
 
 # Query the memory system
-results = titans.query("How do transformers work?", top_k=2)
-for result in results:
-    print(f"Content: {result['content']}")
-    print(f"Score: {result['score']}")
-    print(f"Memory source: {result['source']}")  # 'short_term', 'long_term', or 'persistent'
-    print("---")
+results = titans.query("How do transformers work?", top_k=3)
+
+# Generate a response using deepseek-r1-671b via Venice.ai
+context_chunks = [result['content'] for result in results]
+response = venice_api.generate_with_context(
+    query="How do transformers work?",
+    context_chunks=context_chunks
+)
+
+print(response)
 ```
+
+## Using the Document QA CLI Tool
+
+MemoryTitan includes a command-line tool for document question answering:
+
+```bash
+# Make sure your Venice.ai API key is in the .env file first
+python document_question_answering.py --doc path/to/your/document.txt --architecture mac
+```
+
+Options:
+- `--doc`: Path to the document file (required)
+- `--architecture`: Memory architecture to use (choices: mac, mag, mal, mem; default: mac)
+- `--temperature`: Temperature for the LLM response (default: 0.7)
 
 ## Core Components
 
@@ -113,6 +170,14 @@ MemoryTitan offers three ways to combine these memory systems:
    - Processes input sequentially through memory layers
    - Straightforward architecture with good performance
    - Simplest implementation of the three variants
+
+### LLM Integration
+
+MemoryTitan integrates with Venice.ai's API to use the deepseek-r1-671b model:
+
+- Automatically removes the model's `<think></think>` tags
+- Provides a clean interface for generating responses based on retrieved context
+- Handles API authentication and error handling
 
 ## Advanced Usage
 
@@ -157,76 +222,21 @@ titans = TitansManager(
 )
 ```
 
-### Integration Examples
+### Custom LLM Settings
 
-#### Document QA System
-
-```python
-# Load a long document
-with open("long_document.txt", "r") as f:
-    document = f.read()
-
-# Split into chunks and add to memory
-chunks = [document[i:i+1000] for i in range(0, len(document), 1000)]
-titans.add_documents(chunks)
-
-# Query the document
-answer = titans.query("What are the main findings in the document?", top_k=3)
-```
-
-#### Chat System with Long-term Memory
+Adjust the behavior of the deepseek-r1-671b model:
 
 ```python
-# Initialize chat history
-chat_history = []
+from llm_integration import venice_api
 
-def chat(user_input):
-    # Add user input to history
-    chat_history.append(f"User: {user_input}")
-    
-    # Add to short-term memory
-    titans.add_documents([user_input], memory_type="short_term")
-    
-    # Get response by combining short and long-term memories
-    response_components = titans.query(user_input, top_k=5)
-    
-    # Generate response (in a real system, you'd use an LLM here)
-    response = f"Response based on {len(response_components)} memory items"
-    
-    # Add response to history
-    chat_history.append(f"Assistant: {response}")
-    
-    # Important information moves to long-term memory
-    titans.consolidate_memories()
-    
-    return response
-```
-
-## Implementation Details
-
-### Long-term Memory Module
-
-The long-term memory module is implemented following the paper's description:
-
-1. **Surprise Metric**: Measures how unexpected new information is compared to existing memories
-2. **Momentum-based Update**: Considers both immediate and recent past surprise
-3. **Forgetting Mechanism**: Adaptively erases old memories when they're no longer relevant
-4. **Deep Memory**: Uses multiple layers to capture complex relationships in the data
-
-```python
-# Internal update mechanism (simplified)
-def update_long_term_memory(self, input_embedding, input_text):
-    # Compute surprise metric
-    surprise = self._compute_surprise(input_embedding)
-    
-    # Update memory with momentum
-    self.momentum = self.momentum_factor * self.momentum + surprise
-    
-    # Apply forgetting mechanism
-    self.memory = (1 - self.forget_rate) * self.memory + self.momentum
-    
-    # Store the mapping for later retrieval
-    self.content_map.append((input_text, input_embedding))
+# Generate with custom settings
+response = venice_api.generate_response(
+    prompt="Explain quantum computing",
+    system_prompt="You are a quantum physics expert explaining complex concepts simply.",
+    temperature=0.3,  # Lower for more deterministic responses
+    max_tokens=2048,  # Longer responses
+    clean_thinking=True  # Remove <think></think> tags
+)
 ```
 
 ## References
@@ -237,7 +247,3 @@ The implementation is based on the paper:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
