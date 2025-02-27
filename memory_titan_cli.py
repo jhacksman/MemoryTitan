@@ -13,8 +13,15 @@ import re
 from typing import List, Optional
 from dotenv import load_dotenv
 
-from memory_titan import TitansManager
-from memory_titan.embedding.embedders import get_default_embedder
+# Add the necessary paths
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "core"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "memory"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "embedding"))
+sys.path.insert(0, os.path.dirname(__file__))
+
+# Import directly from modules
+from titans_manager import TitansManager
+from embedders import get_default_embedder
 from llm_integration import venice_api
 
 

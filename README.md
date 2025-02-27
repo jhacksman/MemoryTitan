@@ -78,15 +78,75 @@ Then edit the `.env` file to add your Venice.ai API key:
 VENICE_API_KEY=your_api_key_here
 ```
 
+### 6. Run the test script
+
+To verify that your installation is working correctly, run the simple test script:
+
+```bash
+python run_example.py
+```
+
+This will run a basic memory system example without requiring external APIs.
+
+### 7. Try the CLI tool
+
+MemoryTitan includes a command-line interface for document question answering and memory-enhanced chat. First, test with a local document:
+
+```bash
+# Test with the document QA example (requires your API key in the .env file)
+python examples/document_qa.py --doc implementation_guide.md --architecture mac
+
+# Test with the memory chat example with debug information
+python examples/memory_chat.py --architecture mac --debug
+
+# Try the main CLI tool (comprehensive interface)
+python memory_titan_cli.py doc --doc implementation_guide.md --architecture mac
+
+# Or try the CLI chat mode
+python memory_titan_cli.py chat --architecture mac
+
+# Test all three memory architectures to compare their behavior
+python memory_titan_cli.py doc --doc implementation_guide.md --architecture mac  # Memory as Context
+python memory_titan_cli.py doc --doc implementation_guide.md --architecture mag  # Memory as Gate
+python memory_titan_cli.py doc --doc implementation_guide.md --architecture mal  # Memory as Layer
+```
+
 ## Quick Start
 
+### Running the Example
+
+The simplest way to try MemoryTitan is using the provided example script:
+
+```bash
+python run_example.py
+```
+
+This script demonstrates the core functionality without requiring external dependencies such as sentence-transformers.
+
+### Basic Usage
+
+For more advanced usage, see the examples directory or use the code below:
+
 ```python
-from memory_titan import TitansManager
-from memory_titan.embedding.embedders import SentenceTransformerEmbedder
-from llm_integration import venice_api
+import os
+import sys
+
+# Add the necessary paths (required due to the current structure)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "core"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "memory"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "embedding"))
+sys.path.insert(0, os.path.dirname(__file__))
+
+# Import the necessary modules
+from titans_manager import TitansManager
+from embedders import SimpleAverageEmbedder
+from llm_integration import venice_api  # Requires your API key in .env
 
 # Initialize the embedder
-embedder = SentenceTransformerEmbedder("all-MiniLM-L6-v2")
+embedder = SimpleAverageEmbedder()
+
+# Get the embedding dimension
+embedding_dim = embedder.embed(["test"])[0].shape[0]
 
 # Initialize the TitansManager with Memory as Context (MAC) architecture
 titans = TitansManager(
@@ -95,7 +155,7 @@ titans = TitansManager(
     short_term_size=512,  # Size of the short-term memory window
     long_term_size=2048,  # Capacity of the long-term memory
     persistent_size=64,   # Size of the persistent memory
-    vector_dim=384,       # Embedding dimension
+    vector_dim=embedding_dim,
 )
 
 # Add documents to the memory system
@@ -108,7 +168,7 @@ titans.add_documents([
 # Query the memory system
 results = titans.query("How do transformers work?", top_k=3)
 
-# Generate a response using deepseek-r1-671b via Venice.ai
+# Generate a response using deepseek-r1-671b via Venice.ai (requires API key)
 context_chunks = [result['content'] for result in results]
 response = venice_api.generate_with_context(
     query="How do transformers work?",

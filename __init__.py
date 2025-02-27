@@ -6,11 +6,11 @@ This library implements the hierarchical memory system described in
 vector database functionality for managing large context windows.
 """
 
-from .core.titans_manager import TitansManager, ArchitectureType
-from .memory.long_term_memory import LongTermMemory, LongTermMemoryConfig
-from .memory.short_term_memory import ShortTermMemory, ShortTermMemoryConfig
-from .memory.persistent_memory import PersistentMemory, PersistentMemoryConfig
-from .embedding.embedders import (
+from core.titans_manager import TitansManager, ArchitectureType
+from memory.long_term_memory import LongTermMemory, LongTermMemoryConfig
+from memory.short_term_memory import ShortTermMemory, ShortTermMemoryConfig
+from memory.persistent_memory import PersistentMemory, PersistentMemoryConfig
+from embedding.embedders import (
     BaseEmbedder, 
     SentenceTransformerEmbedder,
     SimpleAverageEmbedder,

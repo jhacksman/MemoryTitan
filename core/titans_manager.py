@@ -10,10 +10,17 @@ import numpy as np
 from enum import Enum
 from typing import List, Dict, Tuple, Optional, Union, Any
 
-from ..memory.long_term_memory import LongTermMemory, LongTermMemoryConfig
-from ..memory.short_term_memory import ShortTermMemory, ShortTermMemoryConfig
-from ..memory.persistent_memory import PersistentMemory, PersistentMemoryConfig
-from ..embedding.embedders import BaseEmbedder
+import sys
+import os
+
+# Add the parent directory to the path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# Import from the memory and embedding modules
+from memory.long_term_memory import LongTermMemory, LongTermMemoryConfig
+from memory.short_term_memory import ShortTermMemory, ShortTermMemoryConfig
+from memory.persistent_memory import PersistentMemory, PersistentMemoryConfig
+from embedding.embedders import BaseEmbedder
 
 
 class ArchitectureType(str, Enum):
@@ -319,8 +326,8 @@ class TitansManager:
         """
         Consolidate memories by moving important information from short-term to long-term.
         
-        This simulates the process described in the paper where important information
-        from short-term memory is moved to long-term memory.
+        This implements the surprise-based mechanism from the Titans paper, where
+        information that is surprising to the long-term memory is preferentially stored.
         """
         if self.short_term_memory is None:
             return
@@ -331,21 +338,16 @@ class TitansManager:
         if not short_term_content:
             return
             
-        # If we have content, evaluate it for importance
-        # For simplicity, we'll just consider the most recent few items important
-        important_indices = range(max(0, len(short_term_content) - 3), len(short_term_content))
+        # Get embeddings for all short-term content
+        embeddings = self.embedder.embed(short_term_content)
         
-        # Get the important content
-        important_content = [short_term_content[i] for i in important_indices]
-        
-        # Add these to long-term memory
-        if important_content:
-            # Get embeddings
-            embeddings = self.embedder.embed(important_content)
-            
-            # Add to long-term memory
-            for content, embedding in zip(important_content, embeddings):
-                self.long_term_memory.add(content, embedding)
+        # Evaluate each item for surprise and importance
+        # The long_term_memory.add method will automatically use the 
+        # surprise threshold to determine what to store
+        for content, embedding in zip(short_term_content, embeddings):
+            # Pass through long-term memory's add method which will
+            # compute surprise and store items that exceed the threshold
+            self.long_term_memory.add(content, embedding)
                 
     def clear_memories(self, memory_types: List[str] = None) -> None:
         """
